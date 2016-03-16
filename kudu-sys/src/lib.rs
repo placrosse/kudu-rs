@@ -3,13 +3,15 @@
 pub enum kudu_client {}
 pub enum kudu_client_builder {}
 pub enum kudu_column_schema {}
-pub enum kudu_schema {}
-pub enum kudu_status {}
-pub enum kudu_table_list {}
-pub enum kudu_schema_builder {}
 pub enum kudu_column_schema_builder {}
-pub enum kudu_table_creator {}
 pub enum kudu_partial_row {}
+pub enum kudu_schema {}
+pub enum kudu_schema_builder {}
+pub enum kudu_status {}
+pub enum kudu_table_creator {}
+pub enum kudu_table_list {}
+pub enum kudu_tablet_server {}
+pub enum kudu_tablet_server_list {}
 
 #[repr(C)]
 pub struct kudu_slice {
@@ -152,14 +154,18 @@ extern "C" {
     ////////////////////////////////////////////////////////////////////////////
 
     pub fn kudu_client_destroy(client: *mut kudu_client);
-    pub fn kudu_client_list_tables(client: *const kudu_client,
+    pub fn kudu_client_new_table_creator(client: *mut kudu_client) -> *mut kudu_table_creator;
+    pub fn kudu_client_get_table_schema(client: *mut kudu_client,
+                                        table: kudu_slice,
+                                        schema: *const *mut kudu_schema)
+                                        -> *mut kudu_status;
+    pub fn kudu_client_list_tables(client: *mut kudu_client,
+                                   filter: kudu_slice,
                                    tables: *const *mut kudu_table_list)
                                    -> *mut kudu_status;
-    pub fn kudu_client_table_schema(client: *const kudu_client,
-                                    table: kudu_slice,
-                                    schema: *const *mut kudu_schema)
-                                    -> *mut kudu_status;
-    pub fn kudu_client_new_table_creator(client: *mut kudu_client) -> *mut kudu_table_creator;
+    pub fn kudu_client_list_tablet_servers(client: *mut kudu_client,
+                                           tservers: *const *mut kudu_tablet_server_list)
+                                           -> *mut kudu_status;
 
     ////////////////////////////////////////////////////////////////////////////
     // Kudu Table Creator
@@ -179,6 +185,21 @@ extern "C" {
     pub fn kudu_table_creator_timeout(creator: *mut kudu_table_creator, timeout_ms: i64);
     pub fn kudu_table_creator_wait(creator: *mut kudu_table_creator, wait: /*bool*/i32);
     pub fn kudu_table_creator_create(creator: *mut kudu_table_creator) -> *mut kudu_status;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Kudu Tablet Server List
+    ////////////////////////////////////////////////////////////////////////////
+
+    pub fn kudu_tablet_server_list_destroy(list: *mut kudu_tablet_server_list);
+    pub fn kudu_tablet_server_list_size(list: *const kudu_tablet_server_list) -> usize;
+    pub fn kudu_tablet_server_list_get(list: *const kudu_tablet_server_list, idx: usize) -> *const kudu_tablet_server;
+
+    ////////////////////////////////////////////////////////////////////////////
+    // Kudu Tablet Server
+    ////////////////////////////////////////////////////////////////////////////
+
+    pub fn kudu_tablet_server_hostname(tserver: *const kudu_tablet_server) -> kudu_slice;
+    pub fn kudu_tablet_server_uuid(tserver: *const kudu_tablet_server) -> kudu_slice;
 
     ////////////////////////////////////////////////////////////////////////////////
     // Kudu Partial Row

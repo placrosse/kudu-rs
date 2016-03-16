@@ -6,6 +6,9 @@ use std::process::{Command, Child};
 
 use tempdir::TempDir;
 
+use Client;
+use ClientBuilder;
+
 pub struct MiniCluster {
     _dir: TempDir,
     master_procs: Vec<Child>,
@@ -76,6 +79,14 @@ impl MiniCluster {
             tserver_procs: tserver_procs,
         }
 
+    }
+
+    pub fn client(&self) -> Client {
+        let mut builder = ClientBuilder::new();
+        for addr in &self.master_addrs {
+            builder.add_master_server_addr(&addr.to_string());
+        }
+        builder.build().unwrap()
     }
 
     pub fn master_addrs(&self) -> &[SocketAddr] {

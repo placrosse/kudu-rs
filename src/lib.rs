@@ -177,10 +177,10 @@ pub struct Client {
 
 impl Client {
 
-    pub fn list_tables(&self) -> Result<Vec<&str>> {
+    pub fn list_tables(&mut self, filter: &str) -> Result<Vec<&str>> {
         unsafe {
             let list = ptr::null_mut();
-            try!(Error::from_status(kudu_sys::kudu_client_list_tables(self.inner, &list)));
+            try!(Error::from_status(kudu_sys::kudu_client_list_tables(self.inner, str_into_kudu_slice(filter), &list)));
             let size = kudu_sys::kudu_table_list_size(list);
             let mut tables = Vec::with_capacity(size);
 
@@ -192,18 +192,18 @@ impl Client {
         }
     }
 
-    pub fn table_schema(&self, table: &str) -> Result<Schema> {
+    pub fn table_schema(&mut self, table: &str) -> Result<Schema> {
         unsafe {
             let schema = ptr::null_mut();
-            try!(Error::from_status(kudu_sys::kudu_client_table_schema(self.inner,
-                                                                       str_into_kudu_slice(table),
-                                                                       &schema)));
+            try!(Error::from_status(kudu_sys::kudu_client_get_table_schema(self.inner,
+                                                                           str_into_kudu_slice(table),
+                                                                           &schema)));
 
             Ok(Schema { inner: schema })
         }
     }
 
-    pub fn new_table_creator(&self) -> TableCreator {
+    pub fn new_table_creator(&mut self) -> TableCreator {
         unsafe {
             TableCreator {
                 inner: kudu_sys::kudu_client_new_table_creator(self.inner),
@@ -224,6 +224,9 @@ impl Drop for Client {
             kudu_sys::kudu_client_destroy(self.inner);
         }
     }
+}
+
+pub struct TabletServer {
 }
 
 pub struct Schema {
@@ -967,10 +970,55 @@ mod tests {
     #[test]
     fn test_create_client() {
         let cluster = MiniCluster::new(MiniClusterConfig::default());
-        let mut builder = ClientBuilder::new();
-        for addr in cluster.master_addrs() {
-            builder.add_master_server_addr(&addr.to_string());
-        }
-        builder.build().unwrap();
+        cluster.client();
+    }
+
+    fn all_types_schema() -> Schema {
+        let mut builder = SchemaBuilder::new();
+        builder.add_column("int8").data_type(DataType::Int8)
+               .encoding_type(EncodingType::Prefix)
+               .compression_type(CompressionType::Lz4)
+               .block_size(1024)
+               .nullable(false);
+        builder.add_column("timestamp")
+               .data_type(DataType::Timestamp)
+               .encoding_type(EncodingType::GroupVarint)
+               .compression_type(CompressionType::Default)
+               .block_size(1024)
+               .nullable(false);
+        builder.add_column("string").data_type(DataType::String)
+               .encoding_type(EncodingType::Dictionary)
+               .compression_type(CompressionType::Snappy)
+               .block_size(1024)
+               .nullable(false);
+        builder.add_column("int16").data_type(DataType::Int16);
+        builder.add_column("int32").data_type(DataType::Int32);
+        builder.add_column("int64").data_type(DataType::Int64);
+        builder.add_column("bool").data_type(DataType::Bool);
+        builder.add_column("float").data_type(DataType::Float);
+        builder.add_column("double").data_type(DataType::Double);
+        builder.add_column("binary").data_type(DataType::Binary);
+
+        builder.set_primary_key_columns(&["int8", "timestamp", "string"]);
+        builder.build().unwrap()
+    }
+
+    #[test]
+    fn test_create_schema() {
+        all_types_schema();
+    }
+
+    #[test]
+    fn test_create_table() {
+        let cluster = MiniCluster::new(MiniClusterConfig::default());
+        let mut client = cluster.client();
+        let schema = all_types_schema();
+        client.new_table_creator()
+              .table_name("t")
+              .schema(&schema)
+              .num_replicas(1)
+              .wait(true)
+              .create()
+              .unwrap();
     }
 }
